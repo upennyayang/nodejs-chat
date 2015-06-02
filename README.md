@@ -1,3 +1,3 @@
 # Realtim Chat with Socket.io
 
-A Node.js realtime chat starter project
+A realtime chat server with socket.io and browserify.

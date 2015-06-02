@@ -11,6 +11,8 @@ let flash = require('connect-flash')
 let Server = require('http').Server
 let routes = require('./routes')
 let io = require('socket.io')
+let browserify = require('browserify-middleware')
+
 require('songbird')
 
 module.exports  = class App {
@@ -18,8 +20,11 @@ module.exports  = class App {
         this.app = express()
         this.port = process.env.PORT || 8000
 
-
         let app = this.app
+
+        browserify.settings({transform: ['babelify']})
+        app.use('/js/index.js', browserify('./public/js/index.js'))
+
 
         // set up our express middleware
         app.use(morgan('dev')) // log every request to the console
@@ -30,21 +35,45 @@ module.exports  = class App {
         app.set('views', path.join(__dirname, 'views'))
         app.set('view engine', 'ejs') // set up ejs for templating
 
+        // Save expose your sessions to socket.io:
+        this.sessionMiddleware = session({
+            secret: 'ilovethenodejs',
+            store: new MongoStore({
+                db: 'social-chat'
+            }),
+            resave: true,
+            saveUninitialized: true
+        })
+
         // required for passport
-        app.use(session({
-          secret: 'ilovethenodejs',
-          store: new MongoStore({db: 'social-feeder'}),
-          resave: true,
-          saveUninitialized: true
-        }))
-        this.server = Server(app) //TODO: understand why server instead of app for initiailze function
-        // connect to the database
-        // mongoose.connect(config.database.url)
-        console.log("hello")
+        app.use(this.sessionMiddleware)
+
         // configure routes
-        routes(app)
+        routes(this.app)
 
         this.server = Server(app) //TODO: understand why server instead of app for initiailze function
+        this.io = io(this.server)
+
+        this.io.use((socket, next) => {
+            this.sessionMiddleware(socket.request, socket.request.res, next)
+        })
+
+
+        // Add some connection listeners:
+        this.io.on('connection', socket => {
+            console.log('a user connected')
+
+            let username = socket.request.session.username
+            socket.on('im', msg => {
+                //i'm received
+                console.log("[Received msg from client]", msg)
+                this.io.emit('im', {username, msg})
+            })
+            socket.on('disconnect', () =>  console.log('user disconnected'))
+        })
+
+
+
     }
 
     async initialize(port) {

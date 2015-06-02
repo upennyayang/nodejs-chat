@@ -1,13 +1,6 @@
 let requireDir = require('require-dir')
 let App = require('./app/app')
 
-// const NODE_ENV = process.env.NODE_ENV || 'development'
-// app.config = {
-//   database: config.database[NODE_ENV]
-// }
-
-
-
 let config = requireDir('./config', {recursive: true})
 let port = process.env.PORT || 8000
 let app = new App(config)
